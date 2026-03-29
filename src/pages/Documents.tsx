@@ -28,8 +28,9 @@ interface Document {
   file_type: string;
   created_at: string;
   category_id: string;
+  uploaded_by: string;
   document_categories?: { name: string } | null;
-  profiles?: { full_name: string } | null;
+  uploader_name?: string | null;
 }
 
 interface Category {
@@ -48,9 +49,10 @@ export default function Documents() {
 
   const fetchDocuments = async () => {
     setLoading(true);
+    // Note: cannot embed profiles via uploaded_by — that column FK is to auth.users, not profiles.
     let query = supabase
       .from("documents")
-      .select("*, document_categories(name), profiles:uploaded_by(full_name)")
+      .select("*, document_categories(name)")
       .order("created_at", { ascending: false });
 
     if (search) {
@@ -60,8 +62,26 @@ export default function Documents() {
       query = query.eq("category_id", categoryFilter);
     }
 
-    const { data } = await query;
-    setDocuments((data as any) || []);
+    const { data: rows, error } = await query;
+    if (error) {
+      console.error("fetchDocuments:", error);
+      toast.error(error.message || "Gagal memuat dokumen");
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
+    const list = (rows || []) as Document[];
+    const userIds = [...new Set(list.map((d) => d.uploaded_by).filter(Boolean))];
+    if (userIds.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("user_id, full_name").in("user_id", userIds);
+      const byUser = new Map((profs || []).map((p) => [p.user_id, p.full_name]));
+      list.forEach((d) => {
+        d.uploader_name = byUser.get(d.uploaded_by) ?? null;
+      });
+    }
+
+    setDocuments(list);
     setLoading(false);
   };
 
@@ -187,7 +207,7 @@ export default function Documents() {
                           {formatFileSize(doc.file_size)}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell text-muted-foreground">
-                          {(doc.profiles as any)?.full_name}
+                          {doc.uploader_name || "—"}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">

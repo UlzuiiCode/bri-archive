@@ -39,7 +39,18 @@ export default function Login() {
         navigate("/dashboard");
       }
     } catch (error: any) {
-      toast.error(error.message || "Terjadi kesalahan");
+      const msg = error.message || "";
+      if (msg.includes("Invalid login credentials")) {
+        toast.error("Email atau password salah. Pastikan akun sudah terdaftar dan email sudah dikonfirmasi.");
+      } else if (msg.includes("Email not confirmed")) {
+        toast.error("Akun Anda sedang menunggu persetujuan admin. Silakan tunggu hingga admin menyetujui akun Anda.");
+      } else if (msg.includes("rate limit") || msg.includes("429")) {
+        toast.error("Terlalu banyak percobaan. Silakan tunggu beberapa menit sebelum mencoba lagi.");
+      } else if (msg.includes("User already registered")) {
+        toast.error("Email sudah terdaftar. Silakan masuk dengan akun yang sudah ada.");
+      } else {
+        toast.error(msg || "Terjadi kesalahan. Silakan coba lagi.");
+      }
     } finally {
       setLoading(false);
     }

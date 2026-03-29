@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -12,6 +13,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -33,11 +35,6 @@ const mainItems = [
   { title: "Kategori", url: "/categories", icon: FolderOpen },
 ];
 
-const adminItems = [
-  { title: "Manajemen Pengguna", url: "/users", icon: Users },
-  { title: "Log Aktivitas", url: "/activity-logs", icon: Activity },
-];
-
 const utilItems = [
   { title: "Notifikasi", url: "/notifications", icon: Bell },
 ];
@@ -47,12 +44,45 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { role, profile, signOut } = useAuth();
+  const [pendingCount, setPendingCount] = useState(0);
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Fetch pending approval count for admins
+  useEffect(() => {
+    if (role !== "admin") return;
+
+    const fetchPendingCount = async () => {
+      const { count } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("is_approved", false);
+      setPendingCount(count || 0);
+    };
+
+    fetchPendingCount();
+
+    // Listen for realtime changes on profiles
+    const channel = supabase
+      .channel("pending-users")
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+        fetchPendingCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [role]);
 
   const initials = profile?.full_name
     ? profile.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
+
+  const adminItems = [
+    { title: "Manajemen Pengguna", url: "/users", icon: Users, badge: pendingCount },
+    { title: "Log Aktivitas", url: "/activity-logs", icon: Activity, badge: 0 },
+  ];
 
   return (
     <Sidebar collapsible="icon">
@@ -100,7 +130,19 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
                       <NavLink to={item.url} end>
                         <item.icon className="w-4 h-4" />
-                        {!collapsed && <span>{item.title}</span>}
+                        {!collapsed && (
+                          <span className="flex items-center gap-2 flex-1">
+                            {item.title}
+                            {item.badge > 0 && (
+                              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-amber-500 text-white animate-pulse">
+                                {item.badge}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {collapsed && item.badge > 0 && (
+                          <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

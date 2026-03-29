@@ -158,6 +158,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          is_approved: boolean
           updated_at: string
           user_id: string
         }
@@ -167,6 +168,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          is_approved?: boolean
           updated_at?: string
           user_id: string
         }
@@ -176,6 +178,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          is_approved?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -204,6 +207,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_confirm_user: {
+        Args: {
+          target_user_id: string
+        }
+        Returns: undefined
+      }
+      admin_reject_user: {
+        Args: {
+          target_user_id: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
