@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Download, Eye, Trash2, FileText } from "lucide-react";
+import { Search, Download, Eye, Trash2, FileText, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { logActivity } from "@/lib/activity-logger";
 import { toast } from "sonner";
@@ -45,15 +45,18 @@ export default function Documents() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortOrder, setSortOrder] = useState("newest");
   const [loading, setLoading] = useState(true);
 
   const fetchDocuments = async () => {
     setLoading(true);
     // Note: cannot embed profiles via uploaded_by — that column FK is to auth.users, not profiles.
+    const ascending = sortOrder === "oldest";
+
     let query = supabase
       .from("documents")
       .select("*, document_categories(name)")
-      .order("created_at", { ascending: false });
+      .order("transaction_date", { ascending });
 
     if (search) {
       query = query.or(`title.ilike.%${search}%,document_number.ilike.%${search}%,description.ilike.%${search}%`);
@@ -93,7 +96,7 @@ export default function Documents() {
 
   useEffect(() => {
     fetchDocuments();
-  }, [search, categoryFilter]);
+  }, [search, categoryFilter, sortOrder]);
 
   const handleDownload = async (doc: Document) => {
     const { data } = await supabase.storage.from("documents").download(doc.file_path);
@@ -154,6 +157,18 @@ export default function Documents() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                <SelectTrigger className="w-full sm:w-[220px]">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="w-4 h-4" />
+                    <SelectValue placeholder="Urutkan" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Terbaru</SelectItem>
+                  <SelectItem value="oldest">Terlama</SelectItem>
+                </SelectContent>
+              </Select>
               <Button onClick={() => navigate("/upload")}>
                 Upload Dokumen
               </Button>
@@ -188,41 +203,63 @@ export default function Documents() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {documents.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell className="font-mono text-sm">{doc.document_number}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{doc.title}</p>
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">{doc.description}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <Badge variant="secondary">{(doc.document_categories as any)?.name}</Badge>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {format(new Date(doc.transaction_date), "dd MMM yyyy", { locale: localeId })}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-muted-foreground">
-                          {formatFileSize(doc.file_size)}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-muted-foreground">
-                          {doc.uploader_name || "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => handleDownload(doc)} title="Download">
-                              <Download className="w-4 h-4" />
-                            </Button>
-                            {role === "admin" && (
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(doc)} title="Hapus">
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {documents.map((doc, index) => {
+                      const currentMonth = format(new Date(doc.transaction_date), "MMMM yyyy", { locale: localeId });
+                      const prevMonth = index > 0
+                        ? format(new Date(documents[index - 1].transaction_date), "MMMM yyyy", { locale: localeId })
+                        : null;
+                      const showMonthHeader = index === 0 || currentMonth !== prevMonth;
+
+                      return (
+                        <>
+                          {showMonthHeader && (
+                            <TableRow key={`month-${currentMonth}-${index}`}>
+                              <TableCell
+                                colSpan={7}
+                                className="bg-muted/50 py-3 px-4 border-t-2 border-border"
+                              >
+                                <span className="font-semibold text-sm text-foreground capitalize">
+                                  📅 {currentMonth}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          <TableRow key={doc.id}>
+                            <TableCell className="font-mono text-sm">{doc.document_number}</TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{doc.title}</p>
+                                <p className="text-xs text-muted-foreground truncate max-w-[200px]">{doc.description}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <Badge variant="secondary">{(doc.document_categories as any)?.name}</Badge>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {format(new Date(doc.transaction_date), "dd MMM yyyy", { locale: localeId })}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell text-muted-foreground">
+                              {formatFileSize(doc.file_size)}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell text-muted-foreground">
+                              {doc.uploader_name || "—"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => handleDownload(doc)} title="Download">
+                                  <Download className="w-4 h-4" />
+                                </Button>
+                                {role === "admin" && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleDelete(doc)} title="Hapus">
+                                    <Trash2 className="w-4 h-4 text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        </>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
