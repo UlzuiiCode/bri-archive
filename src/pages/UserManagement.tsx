@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, Shield, CheckCircle2, XCircle, Clock, UserCheck, UserX } from "lucide-react";
+import { Users, Shield, CheckCircle2, XCircle, Clock, UserCheck, UserX, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/activity-logger";
 import { format } from "date-fns";
@@ -41,6 +41,9 @@ export default function UserManagement() {
   const [approving, setApproving] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [rejectDialogUser, setRejectDialogUser] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteDialogUser, setDeleteDialogUser] = useState<UserProfile | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -62,6 +65,9 @@ export default function UserManagement() {
 
   useEffect(() => {
     fetchUsers();
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id || null);
+    });
   }, []);
 
   const pendingUsers = users.filter((u) => !u.is_approved);
@@ -108,6 +114,25 @@ export default function UserManagement() {
     } finally {
       setRejecting(null);
       setRejectDialogUser(null);
+    }
+  };
+
+  const handleDeleteUser = async (user: UserProfile) => {
+    setDeleting(user.user_id);
+    try {
+      const { error } = await supabase.rpc("admin_reject_user", {
+        target_user_id: user.user_id,
+      });
+      if (error) throw error;
+
+      toast.success(`Akun ${user.full_name || user.email} berhasil dihapus.`);
+      logActivity("delete_user", "user", user.user_id, { email: user.email, full_name: user.full_name });
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(`Gagal menghapus akun: ${error.message}`);
+    } finally {
+      setDeleting(null);
+      setDeleteDialogUser(null);
     }
   };
 
@@ -215,6 +240,7 @@ export default function UserManagement() {
               <TableHead>Role</TableHead>
               <TableHead className="hidden md:table-cell">Terdaftar</TableHead>
               <TableHead>Ubah Role</TableHead>
+              <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -258,6 +284,22 @@ export default function UserManagement() {
                         <SelectItem value="pegawai">Pegawai</SelectItem>
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {u.user_id === currentUserId ? (
+                      <span className="text-xs text-muted-foreground italic">Anda</span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleteDialogUser(u)}
+                        disabled={deleting === u.user_id}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        {deleting === u.user_id ? "Menghapus..." : "Hapus"}
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -345,6 +387,31 @@ export default function UserManagement() {
               onClick={() => rejectDialogUser && handleReject(rejectDialogUser)}
             >
               Ya, Tolak & Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Active User Confirmation Dialog */}
+      <AlertDialog open={!!deleteDialogUser} onOpenChange={(open) => !open && setDeleteDialogUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Hapus Akun Pegawai?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Anda yakin ingin menghapus akun <strong>{deleteDialogUser?.full_name || deleteDialogUser?.email}</strong>?
+              Semua data terkait akun ini akan dihapus secara permanen dan tidak dapat dikembalikan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteDialogUser && handleDeleteUser(deleteDialogUser)}
+            >
+              Ya, Hapus Akun
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
