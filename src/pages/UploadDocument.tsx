@@ -42,6 +42,8 @@ export default function UploadDocument() {
     categoryId: "",
     transactionType: "",
     transactionDate: "",
+    amount: "",
+    relatedParty: "",
   });
 
   useEffect(() => {
@@ -87,6 +89,8 @@ export default function UploadDocument() {
         category_id: form.categoryId,
         transaction_type: form.transactionType,
         transaction_date: form.transactionDate,
+        amount: form.amount ? parseInt(form.amount.replace(/\D/g, ""), 10) : null,
+        related_party: form.relatedParty || null,
         file_path: filePath,
         file_name: file.name,
         file_size: file.size,
@@ -151,6 +155,31 @@ export default function UploadDocument() {
                   placeholder="Masukkan judul dokumen"
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="amount">Nominal (Rp)</Label>
+                  <Input
+                    id="amount"
+                    value={form.amount}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      const formatted = val ? new Intl.NumberFormat("id-ID").format(parseInt(val, 10)) : "";
+                      setForm({ ...form, amount: formatted });
+                    }}
+                    placeholder="Contoh: 1.500.000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="relatedParty">Pihak Terkait</Label>
+                  <Input
+                    id="relatedParty"
+                    value={form.relatedParty}
+                    onChange={(e) => setForm({ ...form, relatedParty: e.target.value })}
+                    placeholder="Nama Vendor / Nasabah / Pengirim"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

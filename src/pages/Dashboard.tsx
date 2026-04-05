@@ -16,10 +16,11 @@ interface Stats {
 
 interface RecentActivity {
   id: string;
+  user_id: string;
   action: string;
   entity_type: string;
   created_at: string;
-  profiles?: { full_name: string } | null;
+  user_name?: string | null;
 }
 
 export default function Dashboard() {
@@ -47,12 +48,25 @@ export default function Dashboard() {
     };
 
     const fetchActivities = async () => {
-      const { data } = await supabase
+      const { data: rows } = await supabase
         .from("activity_logs")
-        .select("id, action, entity_type, created_at, profiles:user_id(full_name)")
+        .select("id, user_id, action, entity_type, created_at")
         .order("created_at", { ascending: false })
         .limit(10);
-      if (data) setRecentActivities(data as any);
+
+      const list = (rows || []) as RecentActivity[];
+      const userIds = [...new Set(list.map((l) => l.user_id).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", userIds);
+        const byUser = new Map((profs || []).map((p) => [p.user_id, p.full_name]));
+        list.forEach((l) => {
+          l.user_name = byUser.get(l.user_id) ?? null;
+        });
+      }
+      setRecentActivities(list);
     };
 
     fetchStats();
@@ -107,7 +121,7 @@ export default function Dashboard() {
                     <Activity className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-foreground">
-                        <span className="font-medium">{(activity.profiles as any)?.full_name || "User"}</span>
+                        <span className="font-medium">{activity.user_name || "User"}</span>
                         {" — "}
                         {activity.action} ({activity.entity_type})
                       </p>

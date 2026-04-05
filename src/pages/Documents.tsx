@@ -22,6 +22,8 @@ interface Document {
   description: string | null;
   transaction_type: string;
   transaction_date: string;
+  amount: number | null;
+  related_party: string | null;
   file_name: string;
   file_path: string;
   file_size: number;
@@ -197,8 +199,10 @@ export default function Documents() {
                       <TableHead>Judul</TableHead>
                       <TableHead className="hidden md:table-cell">Kategori</TableHead>
                       <TableHead className="hidden md:table-cell">Tgl. Transaksi</TableHead>
-                      <TableHead className="hidden lg:table-cell">Ukuran</TableHead>
-                      <TableHead className="hidden lg:table-cell">Diupload oleh</TableHead>
+                      <TableHead className="hidden lg:table-cell whitespace-nowrap">Nominal</TableHead>
+                      <TableHead className="hidden lg:table-cell">Pihak Terkait</TableHead>
+                      <TableHead className="hidden xl:table-cell">Ukuran</TableHead>
+                      <TableHead className="hidden xl:table-cell">Diupload oleh</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -215,7 +219,7 @@ export default function Documents() {
                           {showMonthHeader && (
                             <TableRow key={`month-${currentMonth}-${index}`}>
                               <TableCell
-                                colSpan={7}
+                                colSpan={9}
                                 className="bg-muted/50 py-3 px-4 border-t-2 border-border"
                               >
                                 <span className="font-semibold text-sm text-foreground capitalize">
@@ -238,10 +242,16 @@ export default function Documents() {
                             <TableCell className="hidden md:table-cell">
                               {format(new Date(doc.transaction_date), "dd MMM yyyy", { locale: localeId })}
                             </TableCell>
-                            <TableCell className="hidden lg:table-cell text-muted-foreground">
+                            <TableCell className="hidden lg:table-cell font-medium whitespace-nowrap">
+                              {doc.amount != null ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(doc.amount) : "—"}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell text-muted-foreground truncate max-w-[150px]">
+                              {doc.related_party || "—"}
+                            </TableCell>
+                            <TableCell className="hidden xl:table-cell text-muted-foreground">
                               {formatFileSize(doc.file_size)}
                             </TableCell>
-                            <TableCell className="hidden lg:table-cell text-muted-foreground">
+                            <TableCell className="hidden xl:table-cell text-muted-foreground">
                               {doc.uploader_name || "—"}
                             </TableCell>
                             <TableCell className="text-right">
